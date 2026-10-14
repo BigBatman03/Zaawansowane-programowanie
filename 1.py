@@ -1,7 +1,7 @@
-def wyswietl_imiona(imiona):
-    for imie in imiona:
-        print(imie)
+
+def powitanie(name, surname):
+    return f"Cześć {name} {surname}!"
 
 
-imiona = ["Adam", "Kasia", "Marek", "Ola", "Piotr"]
-wyswietl_imiona(imiona)
+wynik = powitanie("Jan", "Kowalski")
+print(wynik)

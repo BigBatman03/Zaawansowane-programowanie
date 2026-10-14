@@ -1,7 +1,9 @@
-def wyswietl_parzyste(lista):
-    for i in lista:
-        if i % 2 == 0:
-            print(i)
+def czy_parzysta(liczba: int) -> bool:
+    return liczba % 2 == 0
 
-lista = range(1, 11)
-wyswietl_parzyste(lista)
+
+wynik = czy_parzysta(8)
+if wynik:
+    print("Liczba parzysta")
+else:
+    print("Liczba nieparzysta")
