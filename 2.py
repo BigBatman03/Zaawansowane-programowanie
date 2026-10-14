@@ -1,13 +1,6 @@
-def liczby(lista):
-    wynik = []
-    for liczba in lista:
-        wynik.append(liczba * 2)
-    return wynik
+def pomnoz(liczba1: int, liczba2: int) -> int:
+    return liczba1 * liczba2
 
-def liczby2(lista):
-    return [x * 2 for x in lista]
 
-lista = [1, 2, 3, 4, 5]
-
-print(liczby(lista))
-print(liczby2(lista))
+wynik = pomnoz(6, 7)
+print(wynik)

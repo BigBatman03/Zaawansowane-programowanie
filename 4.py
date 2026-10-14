@@ -1,6 +1,5 @@
-def wyswietl_co2(lista):
-    for i in range(0, len(lista), 2):
-        print(lista[i])
+def suma_wieksza_lub_rowna(liczba1: int, liczba2: int, liczba3: int) -> bool:
+    return liczba1 + liczba2 >= liczba3
 
-lista = range(1, 11)
-wyswietl_co2(lista)
+
+print(suma_wieksza_lub_rowna(5, 7, 10))
