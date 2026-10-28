@@ -8,6 +8,8 @@ class Student:
             return True
         else:
             return False
+
+
 student1 = Student("John", 75)
 student2 = Student("Alice", 45)
 print(student1.ocena())

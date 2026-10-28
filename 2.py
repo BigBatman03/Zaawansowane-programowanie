@@ -141,7 +141,12 @@ ksiazka4 = Book(biblioteka2, "1932-08-18", "Aldous", "Huxley", 268)
 ksiazka5 = Book(biblioteka1, "1813-01-28", "Jane", "Austen", 432)
 
 order1 = Order(pracownik1, student1, [ksiazka1, ksiazka2], "2026-10-20")
-order2 = Order(pracownik2, student2, [ksiazka3, ksiazka4, ksiazka5], "2026-10-21")
+order2 = Order(
+    pracownik2,
+    student2,
+    [ksiazka3, ksiazka4, ksiazka5],
+    "2026-10-21",
+)
 
 print(order1)
 print(order2)
