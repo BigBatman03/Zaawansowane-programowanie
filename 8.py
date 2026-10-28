@@ -27,18 +27,23 @@ class Brewery:
 
     def __str__(self) -> str:
         address = ", ".join(
-            part for part in [
+            part
+            for part in [
                 self.address_1,
                 self.city,
                 self.state_province,
                 self.postal_code,
-                self.country] if part)
+                self.country,
+            ]
+            if part
+        )
         return f"{self.name} ({self.brewery_type}) - {address}"
 
 
 def pobierz_browary(
-        city: Optional[str] = None,
-        liczba: int = 20) -> list[Brewery]:
+    city: Optional[str] = None,
+    liczba: int = 20,
+) -> list[Brewery]:
     params = {"page": 1, "per_page": liczba}
     if city:
         params["by_city"] = city
@@ -54,7 +59,8 @@ def pobierz_browary(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Pobiera browary z Open Brewery DB.")
+        description="Pobiera browary z Open Brewery DB."
+    )
     parser.add_argument("--city")
     args = parser.parse_args()
 

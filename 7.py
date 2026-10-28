@@ -26,12 +26,16 @@ class Brewery:
 
     def __str__(self) -> str:
         address = ", ".join(
-            part for part in [
+            part
+            for part in [
                 self.address_1,
                 self.city,
                 self.state_province,
                 self.postal_code,
-                self.country] if part)
+                self.country,
+            ]
+            if part
+        )
         return f"{self.name} ({self.brewery_type}) - {address}"
 
 
