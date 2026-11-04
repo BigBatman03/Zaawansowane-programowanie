@@ -1,10 +1,10 @@
-"""Add work items to the file-backed queue."""
+"""Add work items to the SQLite-backed queue."""
 
 import argparse
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from queue_storage import QUEUE_FILE, queue_lock, read_jobs, write_jobs
+from queue_storage import DATABASE_FILE, add_jobs
 
 
 def create_jobs(count: int):
@@ -36,11 +36,9 @@ def main():
         parser.error("count must be at least 1")
 
     jobs = create_jobs(args.count)
-    with queue_lock():
-        current_jobs = read_jobs()
-        write_jobs(current_jobs + jobs)
+    add_jobs(jobs)
 
-    print(f"Added {len(jobs)} pending jobs to {QUEUE_FILE}")
+    print(f"Added {len(jobs)} pending jobs to {DATABASE_FILE}")
 
 
 if __name__ == "__main__":

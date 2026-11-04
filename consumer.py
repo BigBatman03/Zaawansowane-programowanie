@@ -1,38 +1,28 @@
-"""Continuously consume and execute jobs from the file-backed queue."""
+"""Continuously consume and execute jobs from the SQLite-backed queue."""
 
 import argparse
 import os
 import time
 from datetime import datetime, timezone
 
-from queue_storage import queue_lock, read_jobs, write_jobs
+from queue_storage import claim_job as claim_queued_job
+from queue_storage import complete_job as complete_queued_job
 
 
 def claim_job():
     """Atomically change the first pending job to in_progress."""
-    with queue_lock():
-        jobs = read_jobs()
-        for job in jobs:
-            if job["status"] == "pending":
-                job["status"] = "in_progress"
-                job["consumer_pid"] = os.getpid()
-                job["started_at"] = datetime.now(timezone.utc).isoformat()
-                write_jobs(jobs)
-                return job
-    return None
+    return claim_queued_job(
+        consumer_pid=os.getpid(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 def complete_job(job_id: str):
     """Mark a job as done after its work has finished."""
-    with queue_lock():
-        jobs = read_jobs()
-        for job in jobs:
-            if job["id"] == job_id:
-                job["status"] = "done"
-                job["finished_at"] = datetime.now(timezone.utc).isoformat()
-                write_jobs(jobs)
-                return
-    raise RuntimeError(f"job {job_id} disappeared from the queue")
+    complete_queued_job(
+        job_id=job_id,
+        finished_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 def consume_jobs(poll_interval: float, work_duration: float):

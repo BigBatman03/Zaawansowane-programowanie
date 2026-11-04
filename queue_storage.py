@@ -1,74 +1,118 @@
-"""Shared storage helpers for the file-backed work queue."""
+"""SQLite storage helpers for the work queue."""
 
-import json
-import os
-import time
+import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from uuid import uuid4
+from typing import Any
 
 
-QUEUE_FILE = Path(__file__).with_name("work_queue.jsonl")
-LOCK_FILE = QUEUE_FILE.with_suffix(".lock")
+DATABASE_FILE = Path(__file__).with_name("work_queue.db")
 
 
 @contextmanager
-def queue_lock(timeout: float = 10.0):
-    """Lock queue operations across producer and consumer processes."""
-    deadline = time.monotonic() + timeout
-    lock_handle = None
-
-    while lock_handle is None:
-        try:
-            lock_handle = LOCK_FILE.open("x", encoding="utf-8")
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                raise TimeoutError("could not acquire the queue lock")
-            time.sleep(0.1)
-
+def _connection():
+    connection = sqlite3.connect(DATABASE_FILE, timeout=10)
     try:
-        yield
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA busy_timeout = 10000")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                description TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (
+                    status IN ('pending', 'in_progress', 'done')
+                ),
+                created_at TEXT NOT NULL,
+                consumer_pid INTEGER,
+                started_at TEXT,
+                finished_at TEXT
+            )
+            """
+        )
+        connection.commit()
+        yield connection
     finally:
-        lock_handle.close()
-        try:
-            LOCK_FILE.unlink()
-        except FileNotFoundError:
-            pass
+        connection.close()
 
 
-def read_jobs():
-    """Read all jobs from the queue file."""
-    if not QUEUE_FILE.exists():
-        return []
+def add_jobs(jobs: list[dict[str, Any]]) -> None:
+    """Add pending jobs to the queue."""
+    with _connection() as connection:
+        connection.executemany(
+            """
+            INSERT INTO jobs (id, description, status, created_at)
+            VALUES (:id, :description, :status, :created_at)
+            """,
+            jobs,
+        )
+        connection.commit()
 
-    jobs = []
-    with QUEUE_FILE.open("r", encoding="utf-8") as queue_file:
-        for line in queue_file:
-            if line.strip():
-                jobs.append(json.loads(line))
-    return jobs
+
+def claim_job(consumer_pid: int, started_at: str) -> dict[str, Any] | None:
+    """Atomically claim the oldest pending job."""
+    with _connection() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute(
+            """
+            SELECT id, description, status, created_at, consumer_pid,
+                   started_at, finished_at
+            FROM jobs
+            WHERE status = 'pending'
+            ORDER BY rowid
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if row is None:
+            connection.rollback()
+            return None
+
+        connection.execute(
+            """
+            UPDATE jobs
+            SET status = 'in_progress',
+                consumer_pid = ?,
+                started_at = ?
+            WHERE id = ? AND status = 'pending'
+            """,
+            (consumer_pid, started_at, row["id"]),
+        )
+        connection.commit()
+
+        job = dict(row)
+        job["status"] = "in_progress"
+        job["consumer_pid"] = consumer_pid
+        job["started_at"] = started_at
+        return job
 
 
-def write_jobs(jobs):
-    """Atomically replace the queue file with the supplied jobs."""
-    temporary_file = QUEUE_FILE.with_name(
-        f".{QUEUE_FILE.name}.{os.getpid()}.{uuid4().hex}.tmp"
-    )
-    try:
-        with temporary_file.open("w", encoding="utf-8") as queue_file:
-            for job in jobs:
-                queue_file.write(json.dumps(job, ensure_ascii=False) + "\n")
-            queue_file.flush()
-            os.fsync(queue_file.fileno())
+def complete_job(job_id: str, finished_at: str) -> None:
+    """Mark a claimed job as completed."""
+    with _connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE jobs
+            SET status = 'done', finished_at = ?
+            WHERE id = ? AND status = 'in_progress'
+            """,
+            (finished_at, job_id),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError(f"job {job_id} is missing or not in progress")
+        connection.commit()
 
-        deadline = time.monotonic() + 2
-        while True:
-            try:
-                temporary_file.replace(QUEUE_FILE)
-                return
-            except PermissionError:
-                if time.monotonic() >= deadline:
-                    raise
-                time.sleep(0.01)
-    finally:
-        temporary_file.unlink(missing_ok=True)
+
+def read_jobs() -> list[dict[str, Any]]:
+    """Return all jobs, ordered by insertion order."""
+    with _connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, description, status, created_at, consumer_pid,
+                   started_at, finished_at
+            FROM jobs
+            ORDER BY rowid
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
